@@ -1,16 +1,21 @@
-revista-online-opt.onrender.com {
-    # Rezolva eroarea 403: Caddy accepta explicit domeniul Render.
+# Forțează ascultarea pe portul intern (10000) pe care Render îl dorește.
+# Acest lucru rezolvă eroarea "No open HTTP ports detected".
+:10000 {
+    # Render se ocupă de SSL. Folosirea "tls internal" sau specificarea unui port HTTP simplu
+    # ajută la evitarea buclelor de redirecționare și a erorilor ALPN/ACME.
+    tls internal
     
     # Serveste fisiere statice
     root * /var/www/html
     file_server
 
-    # Rezolva eroarea 502/socket: Comunica cu PHP-FPM pe TCP (Port 9000)
+    # Comunica cu PHP-FPM pe TCP (Port 9000).
+    # Aceasta rezolvă eroarea "dial unix /var/run/php-fpm.sock: connect: no such file or directory".
     php_fastcgi 127.0.0.1:9000 {
         root /var/www/html
         index index.php
     }
 
-    # Fallback la index.php pentru rute (daca aplicatia este un framework)
+    # Fallback la index.php (necesar pentru orice aplicație cu routing).
     try_files {path} /index.php?{query}
 }
