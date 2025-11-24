@@ -1,0 +1,14 @@
+:8080 {
+    # Render va folosi variabila PORT (10000), dar in Caddy folosim un port intern
+
+    root * /var/www/html
+    file_server
+
+    php_fastcgi unix//var/run/php-fpm.sock {
+        root /var/www/html
+        index index.php
+    }
+
+    # Fallback la index.php pentru rute (daca aplicatia este un framework)
+    try_files {path} /index.php?{query}
+}
