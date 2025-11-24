@@ -1,4 +1,4 @@
-:8080 {
+:10000 {
     # Render va folosi variabila PORT (10000), dar in Caddy folosim un port intern
 
     root * /var/www/html
