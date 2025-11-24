@@ -15,5 +15,5 @@ COPY . /var/www/html
 # Schimbarea permisiunilor (dacă este necesar pentru sesiuni/cache)
 RUN chown -R www-data:www-data /var/www/html
 
-# Comanda de Start (Start Command)
-CMD ["php-fpm"]
+# Ajustare finală: Rulați PHP-FPM în foreground (-F)
+CMD ["php-fpm", "-F"]
