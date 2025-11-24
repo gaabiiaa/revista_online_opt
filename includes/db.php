@@ -14,7 +14,7 @@ $host = $url['host'];
 $dbname = ltrim($url['path'], '/');
 $user = $url['user'];
 $password = $url['pass'];
-$port = $url['port'];
+$port = isset($url['port']) ? $url['port'] : '5432';
 $scheme = $url['scheme']; // 'pgsql' sau 'mysql'
 
 try {
