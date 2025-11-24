@@ -3,7 +3,7 @@ FROM php:8.2-fpm-alpine
 
 # Instaleaza extensiile PostgreSQL SI Caddy (serverul web)
 RUN apk update && \
-    apk add --no-cache postgresql-dev php8-session caddy && \
+    apk add --no-cache postgresql-dev php82-session caddy && \
     docker-php-ext-install pdo pdo_pgsql && \
     rm -rf /var/cache/apk/*
 
