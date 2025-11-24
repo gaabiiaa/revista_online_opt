@@ -1,21 +1,28 @@
 <?php
-$host = '127.0.0.1';
-$db   = 'revista_online';       // numele bazei de date
-$user = 'root';           // user MySQL
-$pass = '';               // parola MySQL
-$charset = 'utf8mb4';
+// Citeste variabila de mediu setata de Render/Fly.io
+$dbUrl = getenv('DATABASE_URL');
 
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+if (!$dbUrl) {
+    die("Eroare fatala: Variabila DATABASE_URL nu este setata.");
+}
 
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,  // afișează erorile
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
+// Extrage componentele URL-ului
+$url = parse_url($dbUrl);
+
+// Conexiunea la baza de date
+$host = $url['host'];
+$dbname = ltrim($url['path'], '/');
+$user = $url['user'];
+$password = $url['pass'];
+$port = $url['port'];
+$scheme = $url['scheme']; // 'pgsql' sau 'mysql'
 
 try {
-    $conn = new PDO($dsn, $user, $pass, $options);
-} catch (\PDOException $e) {
-    die("Conexiune esuata: " . $e->getMessage());
+    // ATENTIE: Modifica 'pgsql' in 'mysql' daca ai ales MariaDB/MySQL pe Render
+    $conn = new PDO("$scheme:host=$host;port=$port;dbname=$dbname;user=$user;password=$password");
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    error_log("Database connection failed: " . $e->getMessage());
+    die("Eroare de conexiune la bază de date. Verificati log-urile.");
 }
 ?>
