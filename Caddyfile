@@ -1,10 +1,12 @@
-:10000 {
-    # Render va folosi variabila PORT (10000), dar in Caddy folosim un port intern
-
+revista-online-opt.onrender.com {
+    # Rezolva eroarea 403: Caddy accepta explicit domeniul Render.
+    
+    # Serveste fisiere statice
     root * /var/www/html
     file_server
 
-   php_fastcgi 127.0.0.1:9000 {
+    # Rezolva eroarea 502/socket: Comunica cu PHP-FPM pe TCP (Port 9000)
+    php_fastcgi 127.0.0.1:9000 {
         root /var/www/html
         index index.php
     }
