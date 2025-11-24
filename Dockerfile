@@ -1,18 +1,18 @@
-# Imaginea de baza PHP
+# Imaginea de baza este php:8.2-fpm-alpine
 FROM php:8.2-fpm-alpine
 
-# Instaleaza extensiile PostgreSQL SI Caddy (serverul web)
+# Instalarea extensiilor necesare, inclusiv pdo_pgsql
 RUN apk update && \
-    apk add --no-cache postgresql-dev php82-session caddy && \
+    apk add --no-cache postgresql-dev php82-session && \
     docker-php-ext-install pdo pdo_pgsql && \
     rm -rf /var/cache/apk/*
 
-# Copiaza fisierele aplicatiei
+# Instaleaza Caddy (Serverul Web)
+RUN apk add --no-cache caddy
+
+# Copiați restul aplicației
 WORKDIR /var/www/html
 COPY . /var/www/html
-
-# Creeaza fisierul de configurare Caddy pentru a trimite traficul la PHP-FPM (Port 9000)
-# Render va expune automat portul 10000
 COPY Caddyfile /etc/caddy/Caddyfile
 
 # Schimba permisiunile
