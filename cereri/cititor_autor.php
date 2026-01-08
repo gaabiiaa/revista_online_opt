@@ -1,5 +1,4 @@
 <?php
-session_start();
 require '../includes/db.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -22,6 +21,10 @@ $error = '';
 
 // Procesare submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // VERIFICARE SECURITY CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Eroare de securitate: Token CSRF invalid! Cerere respinsă.");
+    }
     $accept_rules = isset($_POST['accept_rules']);
     $justification = trim($_POST['justification']);
 
@@ -31,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $check_stmt->execute([':user' => $user_id]);
         
         if ($check_stmt->rowCount() > 0) {
-            $error = "Ai deja o cerere în așteptare sau acceptată. Te rugăm să aștepți decizia adminului.";
+            $error = "Ai deja o cerere în așteptare. Te rugăm să aștepți decizia adminului.";
         } else {
             $stmt = $conn->prepare("INSERT INTO cereri_autor (id_utilizator, text_justificare) VALUES (:user, :just)");
             if ($stmt->execute([':user'=>$user_id, ':just'=>$justification])) {
@@ -253,7 +256,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($role === 'admin'): ?>
             <a href="cereri-admin.php">Cereri</a>
         <?php endif; ?>
-        
+        <?php if ($role === 'cititor' || $role === 'autor'): ?>
+            <a href="../contact.php">Contact</a>
+        <?php endif; ?>
         <a href="../auth/logout.php" class="logout-link">Logout</a>
     </div>
 </header>
@@ -274,6 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST">
+              <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
             <h3>Reguli Esențiale de Autor:</h3>
             <ul>
                 <li>Respectă<a href="reguli.php"> standardele de calitate și etică editorială</a>  ale revistei!</li>

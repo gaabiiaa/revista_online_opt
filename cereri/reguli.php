@@ -1,5 +1,4 @@
  <?php
-session_start();
 require '../includes/db.php'; 
 $role = $_SESSION['user_role'] ?? 'cititor';  
 $user_name = $_SESSION['user_name'] ?? 'Vizitator';
@@ -188,9 +187,17 @@ $user_name = $_SESSION['user_name'] ?? 'Vizitator';
         <?php endif; ?>
 
         <?php if ($role === 'admin'): ?>
-            <a href="cereri-admin.php">Cereri</a>
+            <a href="cereri-admin.php">Cereri & Rapoarte</a>
+        <?php endif; ?>
+
+        <?php if ($role === 'admin'): ?>
+            <a href="../lista_utilizatori.php">Lista Utilizatori</a>
         <?php endif; ?>
         
+        <?php if ($role === 'cititor' || $role === 'autor'): ?>
+            <a href="../contact.php">Contact</a>
+        <?php endif; ?>
+
         <?php if (isset($_SESSION['user_id'])): ?>
              <a href="../auth/logout.php" class="logout-link">Logout</a>
         <?php endif; ?>
@@ -269,7 +276,7 @@ $user_name = $_SESSION['user_name'] ?? 'Vizitator';
 <footer class="footer">
     <p>&copy; 2025 PANORAMA Revistă. Toate drepturile rezervate.</p>
     <div class="social-links">
-        <a href="#">Facebook</a> | <a href="#">Instagram</a> | <a href="#">Twitter</a>
+        <a href="#">Facebook</a> | <a href="#">Instagram</a></a>
     </div>
 </footer>
 
