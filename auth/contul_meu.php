@@ -1,5 +1,4 @@
 <?php
-session_start();
 require '../includes/db.php'; 
 
 if (!isset($_SESSION['user_id'])) {
@@ -37,6 +36,10 @@ $comentarii_postate = $comentarii_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Logica de actualizare a profilului 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profil'])) {
+    // VERIFICARE SECURITY CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Eroare de securitate: Token CSRF invalid! Cerere respinsă.");
+    }
     $nume = trim($_POST['nume']);
     $descriere = trim($_POST['descriere']);
     $data_nastere = $_POST['data_nastere'] ?: NULL;
@@ -149,7 +152,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
             box-shadow: none; 
         }
         
-        /*  PROFILE CARD - */
+        /* PROFILE CARD - */
         .profile-card { 
             padding: 0; 
             overflow: hidden; 
@@ -372,6 +375,180 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
             .profile-tags { justify-content: center; flex-wrap: wrap; }
             .btn-edit-toggle { margin-left: 0 !important; margin-top: 15px; }
         }
+
+        /* =========================================
+           STILURI PENTRU MODAL & ZONA DE PERICOL
+           (Adăugate pentru funcționalitatea de ștergere)
+           ========================================= */
+
+        /* BAZA MODALULUI (Lipseau în codul tău anterior) */
+        .modal-overlay {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; 
+            top: 0;
+            width: 100%; 
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8); 
+            backdrop-filter: grayscale(100%); 
+        }
+
+        .modal-box {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 40px 30px;
+            border: 2px solid #000;         
+            border-radius: 0;               
+            box-shadow: 12px 12px 0px #000; 
+            width: 90%; 
+            max-width: 450px;
+            position: relative;
+            text-align: center;
+            font-family: 'Roboto', sans-serif;
+            color: #000;
+        }
+
+        .close-btn {
+            position: absolute; 
+            right: 15px; 
+            top: 10px;
+            font-size: 32px; 
+            font-weight: bold; 
+            color: #000;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .close-btn:hover { color: #555; }
+
+        /* ZONA DE PERICOL (în pagină) */
+        .account-danger-zone {
+            border-top: 2px solid #000;
+            margin-top: 40px;
+            padding-top: 20px;
+        }
+
+        .danger-title {
+            font-family: 'Playfair Display', serif;
+            text-transform: uppercase;
+            color: #000;
+            margin-bottom: 10px;
+        }
+
+        .danger-text {
+            font-family: 'Roboto', sans-serif;
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* Butonul de declanșare */
+        .btn-delete-trigger {
+            background-color: #fff;
+            color: #000;
+            border: 2px solid #000;
+            padding: 12px 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000; 
+            transition: all 0.2s;
+        }
+
+        .btn-delete-trigger:hover {
+            background-color: #000;
+            color: #fff;
+            box-shadow: 2px 2px 0px #000;
+            transform: translate(2px, 2px);
+        }
+
+        /* ELEMENTE INTERIOARE MODAL */
+        .modal-title-danger {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            color: #000;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 15px;
+        }
+
+        .modal-warning {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        /* Mesaj eroare în interiorul modalului */
+.modal-error-alert {
+    background-color: #000;       /* Fundal negru */
+    color: #ff3333;               /* Text roșu aprins */
+    border: 1px solid #ff3333;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    animation: shake 0.4s;        /* Animația de vibrație */
+}
+
+/* Opțional: animația de tremurat */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+        .input-wrapper label {
+            display: block;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .input-panorama {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #000;
+            border-radius: 0;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+        }
+        
+        .input-panorama:focus {
+            outline: none;
+            background: #fff;
+            border-color: #000;
+        }
+
+        .btn-delete-final {
+            width: 100%;
+            background-color: #000;
+            color: #fff;
+            padding: 15px;
+            border: none;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-delete-final:hover {
+            background-color: #333;
+        }
+
+        .cancel-link {
+            display: block;
+            margin-top: 15px;
+            color: #666;
+            text-decoration: underline;
+            font-size: 13px;
+        }
     </style>
 </head>
 
@@ -379,27 +556,27 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
 
 <header class="classic-header">
     <div class="header-subtitle">TOTUL ESTE PERSONAL. INCLUSIV ACEASTĂ REVISTĂ.</div>
-    
     <h1 class="header-title">PANORAMA</h1>
-    
     <div class="nav-strip">
         <a href="../index.php">Acasă</a>
-        
         <?php if ($role === 'admin' || $role === 'autor'): ?>
             <a href="../articole/articol_add.php">Atelier</a>
         <?php endif; ?>
-        
         <?php if ($role === 'cititor'): ?>
             <a href="../cereri/cititor_autor.php">Echipă</a>
         <?php endif; ?>
-        
         <a href="../cereri/reguli.php">Reguli</a>
         <a href="contul_meu.php" style="font-weight: 700;">Contul Meu</a>
-        
         <?php if ($role === 'admin'): ?>
-            <a href="../cereri/cereri-admin.php">Cereri</a>
+            <a href="../cereri/cereri-admin.php">Cereri & Rapoarte</a>
         <?php endif; ?>
         
+        <?php if ($role === 'admin'): ?>
+            <a href="../lista_utilizatori.php">Lista Utilizatori</a>
+        <?php endif; ?>
+        <?php if ($role === 'cititor' || $role === 'autor'): ?>
+            <a href="../contact.php">Contact</a>
+        <?php endif; ?>
         <a href="../auth/logout.php" class="logout-link">Logout</a>
     </div>
 </header>
@@ -407,7 +584,6 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
 <div class="dashboard-container">
 
     <div class="left-column">
-        
         <?php if($message): ?>
             <div class="card" style="background: #f9f9f9; color: #333; padding: 15px; border-left: 5px solid #000; border-radius: 0;">
                 <?= htmlspecialchars($message); ?>
@@ -417,26 +593,21 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
         <div class="card profile-card">
             <div class="profile-banner"></div>
             <div class="profile-content">
-                
                 <div class="profile-header-area">
                     <div class="profile-avatar-wrapper">
                         <?php $poza = !empty($user_data['poza_profil']) ? '../uploads/profile/'.$user_data['poza_profil'] : 'https://i.postimg.cc/rpLhrY1k/484826919-658875073552295-6683543008384252595-n.jpg'; ?>
                         <img src="<?= $poza; ?>" alt="Avatar" class="profile-avatar">
                     </div>
-                    
                     <div class="profile-name-group">
                         <h2 class="profile-name"><?= htmlspecialchars($user_data['nume']); ?></h2>
-                        <p class="profile-bio" style="margin-top: 0; font-size: 0.9rem; color: #888; font-family: 'Inter', sans-serif;"></p>
                     </div>
                 </div>
-
                 <p class="profile-bio">
                     <?= !empty($user_data['descriere']) ? htmlspecialchars($user_data['descriere']) : 'Nicio descriere publică setată încă. Folosiți formularul din dreapta pentru a adăuga o scurtă prezentare.'; ?>
                 </p>
-                
                 <div class="profile-tags">
                     <span class="pill"><i class="fa-solid fa-user-tag"></i> <?= strtoupper($role); ?></span>
-                    <span class="pill"><i class="fa-solid fa-heart" style="color:#dc3545;"></i> <?= $user_data['nr_likeuri_totale'] ?? 0 ?> LIKES</span>
+                    <span class="pill"><i class="fa-solid fa-heart" style="color:#dc3545;"></i> <?= $user_data['nr_likeuri_totale'] ?? 0 ?> LIKE-uri</span>
                     <span class="pill"><i class="fa-solid fa-file-lines"></i> <?= $user_data['nr_articole'] ?? 0 ?> ARTICOLE</span>
                 </div>
             </div>
@@ -485,6 +656,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
         <div class="card edit-form-card" id="edit-area">
             <h3>Editează Profilul</h3>
             <form method="POST" enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                 <div class="form-group">
                     <label>Nume Public</label>
                     <input type="text" name="nume" class="form-control" value="<?= htmlspecialchars($user_data['nume']) ?>" required>
@@ -511,10 +683,82 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') $message = "Profil 
                 </div>
                 <button type="submit" name="update_profil" class="btn-save">SALVEAZĂ MODIFICĂRILE</button>
             </form>
-        </div>
-    </div>
+        
+            <div class="account-danger-zone">
+                <h3 class="danger-title">ZONA DE PERICOL</h3>
+                <p class="danger-text">Odată ce îți ștergi contul, nu mai există cale de întoarcere. Te rugăm să fii sigur.</p>
+                <button onclick="deschideStergereCont()" class="btn-delete-trigger">
+                    ȘTERGE CONTUL
+                </button>
+            </div>
 
+        </div> </div> </div> <div id="modalStergere" class="modal-overlay">
+    <div class="modal-box">
+        <span class="close-btn" onclick="inchideStergereCont()">&times;</span>
+        
+        <h2 class="modal-title-danger">ȘTERGERE CONT</h2>
+        
+        <p class="modal-warning">
+            Ești pe cale să ștergi definitiv acest cont.<br>
+            Această acțiune este <strong>IREVERSIBILĂ</strong>.
+        </p>
+
+        <?php if (isset($_GET['error']) && $_GET['error'] == 'pass_incorrect'): ?>
+            <div class="modal-error-alert">
+                <i class="fa-solid fa-circle-exclamation"></i> Parola este incorectă!
+            </div>
+        <?php endif; ?>
+        <form action="proceseaza_stergere.php" method="POST">
+            <div class="input-wrapper">
+                <label for="confirm_pass">INTRODU PAROLA PENTRU CONFIRMARE:</label>
+                <input type="password" name="parola" id="confirm_pass" class="input-panorama" required 
+                       <?php if(isset($_GET['error'])) echo 'autofocus'; ?>>
+            </div>
+
+            <button type="submit" class="btn-delete-final">
+                AM ÎNȚELES, ȘTERGE CONTUL
+            </button>
+        </form>
+
+        <a href="#" onclick="inchideStergereCont()" class="cancel-link">Anulează, m-am răzgândit</a>
+    </div>
 </div>
+
+<script>
+    function deschideStergereCont() {
+        document.getElementById("modalStergere").style.display = "block";
+    }
+
+    function inchideStergereCont() {
+        document.getElementById("modalStergere").style.display = "none";
+    }
+
+    // Închide modalul dacă se dă click în afara cutiei
+    window.onclick = function(event) {
+        var modal = document.getElementById("modalStergere");
+        if (event.target == modal) {
+            inchideStergereCont();
+        }
+    }
+
+    // === LOGICA PENTRU EROARE ===
+    <?php if (isset($_GET['error']) && $_GET['error'] == 'pass_incorrect'): ?>
+        
+        // 1. Deschide modalul ca să vezi eroarea
+        deschideStergereCont();
+
+        // 2. Curăță URL-ul imediat, ca să nu mai apară eroarea la Refresh
+        if (window.history.replaceState) {
+            // Creează un nou URL fără parametrul "?error=..."
+            const url = new URL(window.location.href);
+            url.searchParams.delete('error');
+            
+            // Actualizează bara de adresă fără să reîncarce pagina
+            window.history.replaceState(null, '', url.toString());
+        }
+
+    <?php endif; ?>
+</script>
 
 <footer class="footer">
     <p>&copy; 2025 PANORAMA Revistă. Toate drepturile rezervate.</p>
