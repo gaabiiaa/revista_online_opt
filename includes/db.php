@@ -10,19 +10,23 @@ $charset = 'utf8mb4';
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
 
 $options = [
-    // Afișează erorile ca excepții PDO (recomandat pentru debug și producție)
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, 
-    // Returnează datele ca array-uri asociative
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,  // afișează erorile
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    // Dezactivează emularea preparării interogărilor
     PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
 try {
     $conn = new PDO($dsn, $user, $pass, $options);
 } catch (\PDOException $e) {
-    // Înlocuim die cu un mesaj de eroare mai explicit.
-    die("Eroare de conexiune la baza de date InfinityFree: " . $e->getMessage());
+    die("Conexiune esuata: " . $e->getMessage());
 }
-// Conexiunea ($conn) este gata de utilizare în restul aplicației.
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Generăm un token CSRF dacă nu există
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 ?>
