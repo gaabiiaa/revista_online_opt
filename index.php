@@ -1,5 +1,4 @@
 <?php
-session_start();
 require 'includes/db.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -25,6 +24,10 @@ switch($sort){
 
 // Gestionare POST (like + comentariu)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // VERIFICARE SECURITY CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Eroare de securitate: Token CSRF invalid! Cerere respinsă.");
+    }
     // Like articol
     if (isset($_POST['like_articol'])) {
         $id_articol = $_POST['id_articol'];
@@ -74,7 +77,68 @@ if (!empty($articole)) {
     $user_likes = array_column($check_likes_stmt->fetchAll(PDO::FETCH_ASSOC), 'id_articol');
 }
 ?>
+<?php
+// ... (codul de Login și POST rămâne mai sus) ...
 
+// =========================================================
+// LOGICA DE SORTARE ȘI FILTRARE ARTICOLE
+// =========================================================
+
+// 1. Preluăm parametrii din URL
+$sort = $_GET['sort'] ?? 'data';            // ex: index.php?sort=like
+$categorie_selectata = $_GET['categ'] ?? null; // ex: index.php?categ=Sport
+$sql_params = [];
+
+// 2. Stabilim regula de sortare (ORDER BY)
+switch($sort){
+    case 'like':
+        // Sortăm după coloana calculată 'like_cnt'
+        $order_by = "like_cnt DESC";
+        break;
+    case 'categorie':
+        // Sortăm alfabetic după numele categoriei
+        $order_by = "c.denumire ASC";
+        break;
+    default:
+        // Implicit: cele mai noi primele
+        $order_by = "a.data_publicare DESC";
+}
+
+// 3. Construim interogarea SQL (SELECT + JOIN)
+// Observație: Calculăm like-urile direct aici (subquery) pentru a putea sorta după ele
+$sql = "SELECT a.*, u.nume AS autor, c.denumire AS categorie,
+               (SELECT COUNT(*) FROM likeuri l WHERE l.id_articol = a.id_articol AND l.id_comentariu IS NULL) AS like_cnt
+        FROM articole a
+        JOIN utilizatori u ON a.id_autor = u.id_utilizator
+        JOIN categorii c ON a.id_categorie = c.id_categorie";
+
+// 4. Adăugăm Filtrarea după Categorie (WHERE)
+// Doar dacă utilizatorul a dat click pe o categorie în Sidebar
+if ($categorie_selectata) {
+    $sql .= " WHERE c.denumire = :categ";
+    $sql_params[':categ'] = $categorie_selectata;
+}
+
+// 5. Adăugăm Sortarea (ORDER BY)
+$sql .= " ORDER BY $order_by";
+
+// 6. Executăm interogarea finală
+$articole_stmt = $conn->prepare($sql);
+$articole_stmt->execute($sql_params);
+$articole = $articole_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 7. Verificăm Like-urile utilizatorului curent (pentru inima roșie)
+$user_likes = [];
+if (!empty($articole)) {
+    $articol_ids = array_column($articole, 'id_articol');
+    $placeholders = implode(',', array_fill(0, count($articol_ids), '?'));
+    
+    // Căutăm like-urile doar pentru articolele pe care le afișăm
+    $check_likes_stmt = $conn->prepare("SELECT id_articol FROM likeuri WHERE id_utilizator = ? AND id_articol IN ($placeholders) AND id_comentariu IS NULL");
+    $check_likes_stmt->execute(array_merge([$user_id], $articol_ids));
+    $user_likes = array_column($check_likes_stmt->fetchAll(PDO::FETCH_ASSOC), 'id_articol');
+}
+?>
 <!DOCTYPE html>
 <html lang="ro">
 <head>
@@ -297,6 +361,18 @@ if (!empty($articole)) {
             margin-left: 5px;
             border-radius: 0;
         }
+        .report-link {
+        display: inline-block;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #3fde45ff; /* Roșu pentru Delete */
+        padding-bottom: 5px;
+        border-bottom: 2px solid #3fde45ff;
+        transition: color 0.2s;
+        margin-right: 20px;
+        cursor: pointer;
+    }
         /* Stil pentru link-ul de Ștergere */
     .delete-link {
         display: inline-block;
@@ -376,7 +452,15 @@ if (!empty($articole)) {
         <a href="auth/contul_meu.php">Contul meu</a>
 
         <?php if ($role === 'admin'): ?>
-            <a href="cereri/cereri-admin.php">Cereri</a>
+            <a href="cereri/cereri-admin.php">Cereri & Rapoarte</a>
+        <?php endif; ?>
+
+        <?php if ($role === 'admin'): ?>
+            <a href="../lista_utilizatori.php">Lista Utilizatori</a>
+        <?php endif; ?>
+
+        <?php if ($role === 'cititor' || $role === 'autor'): ?>
+            <a href="../contact.php">Contact</a>
         <?php endif; ?>
         
         <a href="auth/logout.php" class="logout-link">Logout</a>
@@ -389,11 +473,121 @@ if (!empty($articole)) {
         <form method="GET" class="sort-options">
             Sortează după:
             <select name="sort" onchange="this.form.submit()">
-                <option value="data" <?= $sort=='data'?'selected':'' ?>>Data</option>
-                <option value="like" <?= $sort=='like'?'selected':'' ?>>Like-uri</option>  
+                <option value="data" <?= $sort=='data'?'selected':'' ?>>DATA</option>
+                <option value="like" <?= $sort=='like'?'selected':'' ?>>LIKE-uri</option>  
             </select>
         </form>
+<style>
+    /* Stiluri pentru Widget-ul RSS */
+    .rss-container {
+        background: #fff;
+        border: 2px solid #000;
+        box-shadow: 5px 5px 0px #000; /* Umbra specifică site-ului tău */
+        font-family: 'Inter', sans-serif;
+        max-width: 100%; /* Se adaptează la containerul părinte */
+        overflow: hidden; /* Ca să nu iasă conținutul */
+    }
 
+    .rss-header {
+        background-color: #000;
+        color: #fff;
+        padding: 15px;
+        margin: 0;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.2rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .rss-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .rss-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.2s ease;
+    }
+
+    .rss-item:last-child {
+        border-bottom: none;
+    }
+
+    .rss-item:hover {
+        background-color: #f9f9f9;
+    }
+
+    .rss-link {
+        text-decoration: none;
+        color: #1A1D1F;
+        font-weight: 600;
+        font-size: 1rem;
+        line-height: 1.4;
+        display: block;
+        margin-bottom: 5px;
+        transition: color 0.2s;
+    }
+
+    .rss-link:hover {
+        color: #d9534f; /* Roșu accent la hover */
+        text-decoration: underline;
+    }
+
+    .rss-date {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .rss-error {
+        padding: 15px;
+        color: #d9534f;
+        font-style: italic;
+    }
+</style>
+
+<div class="rss-container" style="margin-bottom: 40px;">
+    <h3 class="rss-header">
+         Știri Externe (Digi24)
+    </h3>
+    
+    <ul class="rss-list">
+        <?php
+        $rss_url = "https://www.digi24.ro/rss"; 
+        
+        // Folosim @ pentru a ascunde erorile PHP native dacă site-ul e picat
+        $rss = @simplexml_load_file($rss_url);
+
+        if($rss) {
+            $limit = 3;
+            $count = 0;
+            foreach ($rss->channel->item as $item) {
+                if ($count >= $limit) break;
+                
+                // Formatare dată
+                $date = date('d.m.Y | H:i', strtotime($item->pubDate));
+                
+                echo "<li class='rss-item'>";
+                echo "<a href='{$item->link}' target='_blank' class='rss-link'>{$item->title}</a>";
+                echo "<div class='rss-date'><i class='far fa-clock'></i> {$date}</div>";
+                echo "</li>";
+                
+                $count++;
+            }
+        } else {
+            echo "<li class='rss-error'>Nu s-au putut încărca știrile momentan.</li>";
+        }
+        ?>
+    </ul>
+</div>
 <?php foreach($articole as $articol): ?>
     <article class="post-card">
         
@@ -435,6 +629,208 @@ if (!empty($articole)) {
                         <i class="fas fa-edit"></i> Editează
                     </a>
                     <?php endif; ?>
+                <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] != $articol['id_autor'] && $_SESSION['user_role'] !== 'admin'): ?>
+    <div style="margin: 20px 0;">
+        <button onclick="deschideRaportare('articol', <?= $articol['id_articol']; ?>)" class="btn-raporteaza-mic">
+            <i class="fa-solid fa-flag"></i> Raportează Articolul
+        </button>
+    </div>
+<?php endif; ?>
+
+<div id="modalRaportare" class="modal-panorama" style="display:none;">
+    <span class="close-btn" onclick="inchideRaportare()">&times;</span>
+    
+    <h2 class="modal-title">RAPORTEAZĂ CONȚINUT</h2>
+    <div class="modal-subtitle">Selectează motivul raportării:</div>
+
+    <form action="../raporteaza.php" method="POST">
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
+        <input type="hidden" name="tip_continut" id="raport_tip" value="">
+        <input type="hidden" name="id_obiect" id="raport_id" value="">
+        <input type="hidden" name="return_url" value="<?= $_SERVER['REQUEST_URI']; ?>">
+
+        <div class="radio-group">
+            <label class="radio-label">
+                <input type="radio" name="motiv" value="Spam sau Reclamă" required>
+                <span class="checkmark"></span> Spam sau Reclamă
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="motiv" value="Limbaj vulgar / Jigniri">
+                <span class="checkmark"></span> Limbaj vulgar / Jigniri
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="motiv" value="Informații false">
+                <span class="checkmark"></span> Informații false
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="motiv" value="Instigare la ură">
+                <span class="checkmark"></span> Instigare la ură
+            </label>
+        </div>
+
+        <button type="submit" class="submit-btn">TRIMITE RAPORTUL</button>
+    </form>
+</div>
+
+<div id="overlayRaport" class="modal-overlay" onclick="inchideRaportare()" style="display:none;"></div>
+<style>
+    /* === STILURI BUTON RAPORTARE === */
+.btn-raporteaza-mic {
+    background-color: #fff;
+    color: #000;                
+    border: 2px solid #000;     /* Chenar negru gros */
+    padding: 8px 16px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 4px 4px 0px #000; /* Umbră solidă (Hard Shadow) */
+    transition: all 0.2s ease;
+}
+
+.btn-raporteaza-mic:hover {
+    background-color: #000;
+    color: #fff;
+    box-shadow: 2px 2px 0px #000; /* Efect de apăsare */
+    transform: translate(2px, 2px);
+}
+
+/* === STILURI MODAL PANORAMA === */
+.modal-overlay {
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%;
+    background-color: rgba(255, 255, 255, 0.8); /* Albicios transparent */
+    backdrop-filter: grayscale(100%);
+    z-index: 9998;
+}
+
+.modal-panorama {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    border: 2px solid #000;         /* Chenar negru */
+    box-shadow: 12px 12px 0px #000; /* Umbră masivă */
+    width: 90%;
+    max-width: 450px;
+    padding: 40px 30px;
+    z-index: 9999;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.close-btn {
+    position: absolute;
+    top: 10px; right: 15px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    line-height: 1;
+}
+.close-btn:hover { color: #555; }
+
+.modal-title {
+    font-family: 'Playfair Display', serif; /* Font stil ziar */
+    font-size: 26px;
+    text-transform: uppercase;
+    margin: 0 0 10px 0;
+    color: #000;
+    letter-spacing: 1px;
+}
+
+.modal-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 25px;
+    font-weight: 500;
+}
+
+/* Radio Buttons Customizate (Pătrate) */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    position: relative;
+    padding-left: 35px;
+    color: #000;
+}
+
+.radio-label input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Pătratul Checkbox */
+.checkmark {
+    position: absolute;
+    top: 0; left: 0;
+    height: 20px; width: 20px;
+    background-color: #fff;
+    border: 2px solid #000;
+    border-radius: 0; /* Colțuri drepte */
+}
+
+/* Punctul interior când e selectat */
+.radio-label input:checked ~ .checkmark:after {
+    content: "";
+    position: absolute;
+    display: block;
+    left: 3px; top: 3px;
+    width: 10px; height: 10px;
+    background: #000;
+}
+
+/* Buton Trimite */
+.submit-btn {
+    width: 100%;
+    background-color: #000;
+    color: #fff;
+    padding: 14px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.submit-btn:hover {
+    background-color: #333;
+}
+</style>
+
+<script>
+    function deschideRaportare(tip, id) {
+        document.getElementById('raport_tip').value = tip;
+        document.getElementById('raport_id').value = id;
+        document.getElementById('modalRaportare').style.display = 'block';
+        document.getElementById('overlayRaport').style.display = 'block';
+    }
+
+    function inchideRaportare() {
+        document.getElementById('modalRaportare').style.display = 'none';
+        document.getElementById('overlayRaport').style.display = 'none';
+    }
+</script>
                 <?php if ($can_delete) : ?>
                     <a href="articole/articol_delete.php?id=<?= $articol['id_articol']; ?>" 
                        class="delete-link" 
@@ -446,6 +842,7 @@ if (!empty($articole)) {
                     </div>
                 <div style="margin-top: 15px; display: flex; align-items: center; justify-content: space-between;">
                     <form method="POST" style="display:flex; align-items: center; margin-right: 15px;">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="id_articol" value="<?= $articol['id_articol']; ?>">
                         <button type="submit" name="like_articol" class="like-btn <?= $has_liked ? 'liked' : ''; ?>"> 
                         <i class="<?= $has_liked ? 'fas fa-heart' : 'far fa-heart'; ?>"></i> 
@@ -454,6 +851,7 @@ if (!empty($articole)) {
                     </form>
                     
                     <form method="POST" style="display: flex; flex-grow: 1;" class="comment-form">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                         <input type="hidden" name="id_articol" value="<?= $articol['id_articol']; ?>">
                         <input type="text" name="text_comentariu" placeholder="Comentează..." style="width: 100%;" required>
                         <button type="submit" name="add_comentariu">Trimite</button>
@@ -465,24 +863,29 @@ if (!empty($articole)) {
     </article> 
 <?php endforeach; ?>
     </main>
+
      <aside class="sidebar">
-        <section class="sidebar-section">
+    <section class="sidebar-section">
         <h3>Categorii</h3>
         <ul class="category-list">
-            <li><a href="#tehnologie">Tehnologie</a></li>
-            <li><a href="#cultura">Cultură</a></li>
-            <li><a href="#sanatate">Sănătate</a></li>
-            <li><a href="#sport">Sport</a></li>
-            <li><a href="#politica">Politică</a></li>
-            <li><a href="#calatorii">Călătorii</a></li>
-            <li><a href="#gastronomie">Gastronomie</a></li>
-            <li><a href="#educatie">Educație</a></li>
-            <li><a href="#artesimuzica">Arte și Muzică</a></li>
-            <li><a href="#business">Business</a></li>
+            <li><a href="index.php" style="font-weight: bold;">Toate Categoriile</a></li>
+            
+            <li><a href="index.php?categ=Tehnologie">Tehnologie</a></li>
+            <li><a href="index.php?categ=Cultura">Cultura</a></li>
+            <li><a href="index.php?categ=Sanatate">Sanatate</a></li>
+            <li><a href="index.php?categ=Sport">Sport</a></li>
+            <li><a href="index.php?categ=Politica">Politica</a></li>
+            <li><a href="index.php?categ=Calatorii">Calatorii</a></li>
+            <li><a href="index.php?categ=Gastronomie">Gastronomie</a></li>
+            <li><a href="index.php?categ=Educatie">Educatie</a></li>
+            <li><a href="index.php?categ=Arte si Muzica">Arte și Muzica</a></li>
+            <li><a href="index.php?categ=Business">Business</a></li>
+            <li><a href="index.php?categ=Noutati">Noutati</a></li>
         </ul>
-        </section>
-    </aside>
+    </section>
+</aside>
 </div> 
+
 
 <footer class="footer">
     <p>&copy; 2025 PANORAMA Revistă. Toate drepturile rezervate.</p>
