@@ -1,11 +1,14 @@
 <?php
-session_start();
 // Presupunem că db.php este relativ corect
 require '../includes/db.php'; 
 
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // VERIFICARE SECURITY CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("Eroare de securitate: Token CSRF invalid! Cerere respinsă.");
+    }
     $email = $_POST['email'];
     $parola = $_POST['parola'];
 
@@ -17,18 +20,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($stmt->rowCount() > 0) {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Verificăm parola hash-uita
-        if (password_verify($parola, $user['parola'])) {
+       // --- VERIFICĂRI DE SECURITATE ---
+
+        // A. Este BANAT?
+        if ($user['e_banat'] == 1) {
+            $message = "Contul tău a fost blocat de un administrator.";
+        }
+        // B. Este VERIFICAT prin Email? (AICI ESTE MODIFICAREA)
+        elseif ($user['este_verificat'] == 0) {
+            $message = "Te rugăm să accesezi link-ul primit pe email pentru a activa contul!";
+        }
+        // C. Verificăm PAROLA
+        elseif (password_verify($parola, $user['parola'])) {
+            // === LOGARE CU SUCCES ===
+            session_regenerate_id(true);
+
             $_SESSION['user_id'] = $user['id_utilizator'];
             $_SESSION['user_name'] = $user['nume'];
             $_SESSION['user_role'] = $user['rol']; 
 
             header('Location: ../index.php');
             exit;
-        } else {
+        } 
+        else {
+            // Parolă greșită
             $message = "Email sau parolă incorectă.";
         }
     } else {
+        // Utilizatorul nu există
         $message = "Email sau parolă incorectă.";
     }
 }
@@ -172,8 +191,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if($message): ?>
         <p class="message-error"><?= htmlspecialchars($message); ?></p>
     <?php endif; ?>
+    
+    <?php if(isset($_GET['error']) && $_GET['error'] == 'banned'): ?>
+        <p class="message-error">Contul tău a fost blocat.</p>
+    <?php endif; ?>
 
     <form method="POST" class="login-form">
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
         <label for="email">Email:</label>
         <input type="email" id="email" name="email" required><br>
 
