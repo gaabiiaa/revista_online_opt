@@ -12,7 +12,7 @@ O platformă web dinamică dezvoltată în PHP pentru gestionarea și publicarea
 ## 🛠️ Tehnologii folosite
 * **Backend:** PHP
 * **Bază de date:** MySQL
-* **Frontend:** HTML5, CSS3 (și JavaScript / Bootstrap dacă este cazul)
+* **Frontend:** HTML5, CSS3 (și Bootstrap)
 
 ## Easy Access
 
